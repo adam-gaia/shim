@@ -88,6 +88,9 @@ function register_new_repo()
       git-track-repos --quiet --repo-root "${repo_root}" update
       return
     else
+      # TODO: [BUG] running 'git-init' in an already existing git repo
+      # does not cause git to exit with an error. Thus, this block is entered and
+      # the following error message is printed
       echo "Unable to find last init'd git dir"
       echo "Manually cd to it and run"
       echo "    $(which git-track-repos) register"
