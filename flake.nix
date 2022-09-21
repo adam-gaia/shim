@@ -1,5 +1,5 @@
 {
-  description = "Pretty Print";
+  description = "git-shim";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -14,14 +14,14 @@
         package-name = "git-shim";
         runtime-dependencies = [ 
           nonstdlib.packages.${system}.default
+          git-track-repos.packages.${system}.default
         ];
       in rec {
         devShell = pkgs.mkShell {
           buildInputs = [
             pkgs.shellcheck
             pkgs.shfmt
-            git-track-repos
-          ];
+          ] ++ runtime-dependencies;
         };
 
         defaultPackage = pkgs.writeShellApplication {

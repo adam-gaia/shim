@@ -1,19 +1,49 @@
 #!/usr/bin/env bash
-# Shim some operations before passing args to git
+# git-shim
+# Git does not allow aliases or user-defined subcommands to override existing subcommands
+# To get around this, this script shims git and handles some subcommands
+# Any operation not overriden will fall back to the actual git
+# Additoinally, hooks are ran before and after the git call
+# If a hook fails, our shim will stop before  the actual git command is executed
+# Post hooks are only ran if the git command succeded
 set -Eeuo pipefail
 
-GIT_EXEC="/home/agaia/.nix-profile/bin/git"
-ORG_EXEC="$(dirname "$0")/target/debug/org"
 
-echo "[debug] git: ${GIT_EXEC}"
-echo "[debug] org: ${ORG_EXEC}"
+echo "[debug] git exec: '$(command -v git)'"
+echo "[debug] git-track-repos exec: '$(command -v git-track-repos)'"
 
 function pre_hooks() {
   local operation="$1"
   case "${operation}" in
 
-    # No hooks yet
+    # No pre-hooks yet
     *) 
+      ;;
+
+  esac
+}
+
+function commit()
+{
+    if command -v cz &>/dev/null; then
+      # Use commitizen to make the commit
+      cz "${@}"
+    else
+      command git "${@}"
+    fi
+}
+
+function overridden_git()
+{
+  local operation="$1"
+  case "${operation}" in
+    'commit')
+      commit "${@}"
+      ;;
+
+    *)
+      # Fall back to the actual git
+      command git "${@}"
       ;;
 
   esac
@@ -25,7 +55,7 @@ function register_clonned_repo() {
   # Try the last argument; It could be an explictly specified directory
   local repo_root="${git_args[-1]}"
   if [[ -d "${repo_root}" ]]; then
-    "${ORG_EXEC}" --repo-root "${repo_root}" register
+    git-track-repos --repo-root "${repo_root}" register
     return
   fi
 
@@ -35,13 +65,13 @@ function register_clonned_repo() {
   repo_root="${repo_root%.git}" # Remove trailing '.git'
   echo "[debug] ${repo_root}"
   if [[ -d "${repo_root}" ]]; then
-    "${ORG_EXEC}" --repo-root "${repo_root}" register
+    git-track-repos --repo-root "${repo_root}" register
     return
   fi
 
   echo "Unable to find last clonned git dir"
   echo "Manually cd to it and run"
-  echo "    ${ORG_EXEC} register"
+  echo "    $(which git-track-repos) register"
   echo "[debug] Git command '${git_args[*]}'"
   return 1
 }
@@ -62,13 +92,7 @@ if [[ "$#" -eq 0 ]]; then
   exit 2
 fi
 
-# Pre hooks are always ran first
-# If a hook fails, our shim will stop before  the actual git command is executed
 pre_hooks "${@}"
-
-# Pass arguments to git
-"${GIT_EXEC}" "${@}"
-
-# Post hooks are only ran if the git command succeded
+overridden_git "${@}"
 post_hooks "${@}"
 
