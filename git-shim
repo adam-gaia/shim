@@ -16,11 +16,8 @@ function pre_hooks() {
   local operation="$1"
   case "${operation}" in
 
-    'clone'|'track-repos')
-      # Do nothing - this stops us from hitting the default case for these particular operations
-      ;;
-    *) 
-      git-track-repos --quiet update || true # Ok to fail (not called in)
+    *)
+      # No hooks yet
       ;;
 
   esac
@@ -79,12 +76,45 @@ function register_clonned_repo() {
   return 1
 }
 
+function register_new_repo()
+{
+  if [[ "$#" -gt 0 ]]; then
+    local git_args=("$@")
+
+    # Parse the repo path we've init'd
+    # Try the last argument; It could be an explictly specified directory
+    local repo_root="${git_args[-1]}"
+    if [[ -d "${repo_root}" ]]; then
+      git-track-repos --quiet --repo-root "${repo_root}" update
+      return
+    else
+      echo "Unable to find last init'd git dir"
+      echo "Manually cd to it and run"
+      echo "    $(which git-track-repos) register"
+      echo "[debug] Git command '${git_args[*]}'"
+      return 1
+    fi
+  fi
+
+  # Otherwise the working dir is our new repo
+  git-track-repos --quiet
+}
+
 function post_hooks() {
   local operation="$1"
   case "${operation}" in
 
+    'commit')
+      # Update the entry in the database on each commit
+      git-track-repos --quiet update
+      ;;
+
     'clone')
       register_clonned_repo "$@"
+      ;;
+
+    'init')
+      register_new_repo "$@"
       ;;
 
   esac
