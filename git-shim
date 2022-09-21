@@ -16,11 +16,11 @@ function pre_hooks() {
   local operation="$1"
   case "${operation}" in
 
+    'clone'|'track-repos')
+      # Do nothing - this stops us from hitting the default case for these particular operations
+      ;;
     *) 
-      # TODO: figure out how best have exclusions
-      if [[ "${operation}" != 'clone' ]]; then
-        git-track-repos --quiet update
-      fi
+      git-track-repos --quiet update || true # Ok to fail (not called in)
       ;;
 
   esac
