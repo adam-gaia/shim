@@ -19,7 +19,7 @@ function pre_hooks() {
     *) 
       # TODO: figure out how best have exclusions
       if [[ "${operation}" != 'clone' ]]; then
-        git-track-repos
+        git-track-repos --quiet update
       fi
       ;;
 
@@ -58,7 +58,7 @@ function register_clonned_repo() {
   # Try the last argument; It could be an explictly specified directory
   local repo_root="${git_args[-1]}"
   if [[ -d "${repo_root}" ]]; then
-    git-track-repos --repo-root "${repo_root}" update
+    git-track-repos --quiet --repo-root "${repo_root}" update
     return
   fi
 
@@ -68,7 +68,7 @@ function register_clonned_repo() {
   repo_root="${repo_root%.git}" # Remove trailing '.git'
   echo "[debug] ${repo_root}"
   if [[ -d "${repo_root}" ]]; then
-    git-track-repos --repo-root "${repo_root}" update
+    git-track-repos --quiet --repo-root "${repo_root}" update
     return
   fi
 

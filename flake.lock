@@ -297,11 +297,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1663770026,
-        "narHash": "sha256-3qMp5eWr/JDqo3hHyaL56uJT0u1IRV7rXJNX2Y6yI7k=",
+        "lastModified": 1663779598,
+        "narHash": "sha256-H+ODzOWqlQqcVo8MZiKd6d0ScBD5Zw8EnJZe8SmYE48=",
         "owner": "adam_gaia",
         "repo": "git-track-repos",
-        "rev": "28d06aa38d8417c28d602ade423c156cb29c00bb",
+        "rev": "fc818507fe62b51ebb44c482c7b665a3e8d6282a",
         "type": "gitlab"
       },
       "original": {
