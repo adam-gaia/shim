@@ -23,14 +23,12 @@ function pre_hooks() {
   esac
 }
 
-function commit()
+function commit_handler()
 {
-    if command -v cz &>/dev/null; then
-      # Use commitizen to make the commit
-      cz "${@}"
-    else
-      command git "${@}"
-    fi
+  # Use commitizen to make the commit
+  cz "${@}"
+
+  # TODO: use git comit --no-verify to skip pre-commit checks
 }
 
 function overridden_git()
@@ -38,7 +36,12 @@ function overridden_git()
   local operation="$1"
   case "${operation}" in
     'commit')
-      commit "${@}"
+      commit_handler "${@}"
+      ;;
+
+    'cz')
+      # Call commitizen
+      command cz "${@}"
       ;;
 
     *)

@@ -12,7 +12,8 @@
       let
         pkgs = import nixpkgs { inherit system; };
         package-name = "git-shim";
-        runtime-dependencies = [ 
+        runtime-dependencies = with pkgs; [ 
+          pkgs.commitizen
           nonstdlib.packages.${system}.default
           git-track-repos.packages.${system}.default
         ];
