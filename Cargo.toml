@@ -2,6 +2,9 @@
 name = "shim"
 version = "0.1.0"
 edition = "2021"
+description = "Create shims for executables from config files"
+license-file = "LICENSE"
+readme = "README.md"
 
 [dependencies]
 anyhow = "1.0.65"
