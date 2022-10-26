@@ -161,19 +161,29 @@ impl App {
                 join_orig_args.push_str(x);
             }
             processed_hook = processed_hook.replace("$@", &join_orig_args)
-        }
+        } 
+        // TODO: can we use the `just` tool's eval/run crate?
+        // https://github.com/casey/just
 
-        debug!("Running command: {}", processed_hook);
+        // Run the processed hook line by line
+        for line in processed_hook.split('\n') {
+            let line = line.trim();
+            if line.starts_with('#') {
+                // Skip commented lines
+                continue
+            }
+            debug!("Running command: {}", line);
 
-        // Run the processed hook
-        let parts: Vec<&str> = processed_hook.split_whitespace().collect();
-        let command = parts[0];
-        let args = &parts[1..];
-        if let Ok(command) = which(command) {
-            let cmd = Command::new(command).args(args).spawn();
-        } else {
-            bail!("Unable to find '{}' on the system path", command);
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            let command = parts[0];
+            let args = &parts[1..];
+            if let Ok(command) = which(command) {
+                let cmd = Command::new(command).args(args).spawn();
+            } else {
+                bail!("Unable to find '{}' on the system path", command);
+            }
         }
+        
         Ok(())
     }
 
