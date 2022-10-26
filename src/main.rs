@@ -91,7 +91,7 @@ impl App {
         let mut shims: HashMap<String, ShimWithMetaInfo> = HashMap::new();
         for path in files_to_read {
             if let Ok(f) = std::fs::File::open(&path) {
-                info!("Reading shims from {}", path.display());
+                debug!("Reading shims from {}", path.display());
                 let shim_file: ShimFile = serde_yaml::from_reader(f)?;
                 for shim in shim_file.shims() {
                     shims.insert(
@@ -106,6 +106,33 @@ impl App {
         }
         let app = App { shims };
         Ok(app)
+    }
+
+    fn list(&self) -> Result<()> {
+        for (program, meta_info_shim) in &self.shims {
+            let shim = &meta_info_shim.shim;
+
+            println!("> {}", program);
+            if let Some(pre_hooks) = shim.pre_hooks() {
+                println!("  * Pre-hooks:");
+                for hook in pre_hooks {
+                    println!("    - {:?}", hook);
+                }
+            }
+            if let Some(overrides) = shim.overrides() {
+                println!("  * Overrides:");
+                for hook in overrides {
+                    println!("    - {:?}", hook);
+                }
+            }
+            if let Some(pre_hooks) = shim.post_hooks() {
+                println!("  * Post-hooks:");
+                for hook in pre_hooks {
+                    println!("    - {:?}", hook);
+                }
+            }
+        }
+        Ok(())
     }
 
     fn generate_shims(&self) -> Result<()> {
@@ -293,9 +320,12 @@ fn main() -> Result<()> {
                 unimplemented!("todo");
             },
             Commands::List => {
-                unimplemented!("todo")
+                app.list()?;
             }
         }
+    }
+    else {
+        app.list()?;
     }
 
     Ok(())
