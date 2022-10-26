@@ -78,6 +78,9 @@ enum Commands {
 
     /// Check that the environment is setup
     Check,
+
+    /// Show all registered hooks
+    List,
 }
 
 struct App {
@@ -277,7 +280,7 @@ fn main() -> Result<()> {
         match &command {
             Commands::Generate => {
                 app.generate_shims()?;
-            }
+            },
             Commands::Exec { trailing_args } => {
                 debug!("Exec {:?}", trailing_args);
                 if let Some((first, rest)) = trailing_args.split_first() {
@@ -285,9 +288,12 @@ fn main() -> Result<()> {
                 } else {
                     bail!("Nothing to exec");
                 }
-            }
+            },
             Commands::Check => {
                 unimplemented!("todo");
+            },
+            Commands::List => {
+                unimplemented!("todo")
             }
         }
     }
