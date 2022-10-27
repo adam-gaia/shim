@@ -9,7 +9,15 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::Stdio;
+use tokio::io::{BufReader, AsyncBufReadExt};
+use tokio::process::Command;
+use tokio_stream::{StreamExt, StreamMap, Stream};
+use tokio_stream::wrappers::LinesStream;
+use std::process::ExitStatus;
+use tokio::io::AsyncRead;
+use std::pin::Pin;
+use tokio::io::Lines;
 use which::which;
 
 mod shim;
@@ -83,6 +91,63 @@ enum Commands {
     List,
 }
 
+
+async fn run_command(exec: &str, args: &[String]) -> Result<(ExitStatus)>
+{
+    if let Err(..) = which(exec) { 
+        bail!("Unable to find '{}' on the system path", exec);
+    }
+    let mut child = Command::new(exec)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    // TODO: handle None case instead of unwrapping
+    let stdout = child.stdout.take().unwrap();
+    let stderr = child.stderr.take().unwrap();
+
+
+    let mut stdout_reader = LinesStream::new(BufReader::new(stdout).lines());
+    let mut stderr_reader = LinesStream::new(BufReader::new(stderr).lines());
+
+    let a = Box::pin(async_stream::stream! {
+        while let Some(item) = stdout_reader.next().await {
+            yield item;
+        }
+    }) as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
+    let b = Box::pin(async_stream::stream! {
+        while let Some(item) = stderr_reader.next().await {
+            yield item;
+        }
+    }) as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
+
+    let mut map = StreamMap::with_capacity(2);
+    map.insert("stdout", a);
+    map.insert("stderr", b);
+
+    let handle: tokio::task::JoinHandle<Result<ExitStatus, std::io::Error>> = tokio::spawn(async move {
+        child.wait().await
+    });
+ 
+    // Stream output to terminal as it runs
+    while let Some((source, line)) = map.next().await {
+        let line = line?; 
+        // TODO: 'match source {}' would allow use to display streams sepreatly
+        println!("{}", line);
+    }
+
+    let child_status = handle.await??;
+    debug!("Child process exited with status {}", child_status);
+        if ! child_status.success() {
+            // TODO figure out rust's ExitStatusExt to check if a
+            // signal killed our process and remove the unwrap
+            // TODO: better error handeling to report if a pre/post/override/originalcmd failed
+            bail!("'{} {:?}' returned non-zero exit code {}", exec, args, child_status.code().unwrap());
+        }
+    Ok(child_status)
+}
+
 struct App {
     shims: HashMap<String, ShimWithMetaInfo>,
 }
@@ -145,7 +210,7 @@ impl App {
         Ok(())
     }
 
-    fn run_hook(
+    async fn run_hook(
         &self,
         hook: &str,
         original_command: &Path,
@@ -170,24 +235,21 @@ impl App {
             let line = line.trim();
             if line.starts_with('#') {
                 // Skip commented lines
+                debug!("Skiping comment {}", line);
                 continue
             }
             debug!("Running command: {}", line);
 
-            let parts: Vec<&str> = line.split_whitespace().collect();
-            let command = parts[0];
+            let parts: Vec<String> = line.split_whitespace().map(|x|x.to_owned()).collect();
+            let command = parts[0].as_str();
             let args = &parts[1..];
-            if let Ok(command) = which(command) {
-                let cmd = Command::new(command).args(args).spawn();
-            } else {
-                bail!("Unable to find '{}' on the system path", command);
-            }
+            run_command(command, args).await?; 
         }
         
         Ok(())
     }
 
-    fn process_shim_hooks(
+    async fn process_shim_hooks(
         &self,
         hooks: &Option<Vec<SubcommandShim>>,
         first_arg: &str,
@@ -205,13 +267,13 @@ impl App {
                     }
                 }
                 // Run the command specified by this hook
-                self.run_hook(&hook.run, original_command, original_args)?;
+                self.run_hook(&hook.run, original_command, original_args).await?;
             }
         }
         Ok(())
     }
 
-    fn run_shimmed_program(
+    async fn run_shimmed_program(
         &self,
         original_command: String,
         original_args: &[String],
@@ -220,10 +282,10 @@ impl App {
         if let Ok(original_command) = which(&original_command) {
             let command_name = original_command.file_name().unwrap(); // TODO: handle unwraps
             let first_arg = if !original_args.is_empty() {
-                original_args[0].as_str()
+                original_args[0].to_string()
             } else {
                 // Consider the first argument an empty string, for matching against a subcommand later
-                ""
+                String::from("")
             };
 
             // Look up a shim based on the command's name
@@ -234,35 +296,37 @@ impl App {
                 // Run pre hooks
                 self.process_shim_hooks(
                     shim.pre_hooks(),
-                    first_arg,
+                    &first_arg,
                     &original_command,
                     original_args,
-                )?;
+                ).await?;
 
                 // Run any overrides
                 let overrides = shim.overrides();
                 if overrides.is_some() {
                     self.process_shim_hooks(
                         overrides,
-                        first_arg,
+                        &first_arg,
                         &original_command,
                         original_args,
-                    )?;
+                    ).await?;
                 } else {
                     // No overrides, run the program itself
                     // TODO: create a function for running with an env so that we can use it here
                     // too. When we do call the same function, make sure we do not redundantly call
                     // 'which'
-                    let cmd = Command::new(&original_command).args(original_args).spawn();
+                    // TODO handle the None case instead of unwrapping
+                    let cmd_as_str = original_command.to_str().unwrap();
+                    run_command(cmd_as_str, original_args).await?;    
                 }
 
                 // Run post hooks
                 self.process_shim_hooks(
                     shim.post_hooks(),
-                    first_arg,
+                    &first_arg,
                     &original_command,
                     original_args,
-                )?;
+                ).await?;
             } else {
                 error!("No registered shim for '{}'", original_command.display());
                 todo!("run this command normally whithout any shims?");
@@ -274,7 +338,8 @@ impl App {
     }
 }
 
-fn main() -> Result<()> {
+#[tokio::main]
+async fn main() -> Result<()> {
     // TODO: KDL might be a better config language for this program https://kdl.dev/
     env_logger::init();
     let this_program_name = clap::crate_name!();
@@ -321,7 +386,7 @@ fn main() -> Result<()> {
             Commands::Exec { trailing_args } => {
                 debug!("Exec {:?}", trailing_args);
                 if let Some((first, rest)) = trailing_args.split_first() {
-                    app.run_shimmed_program(first.to_string(), rest)?;
+                    app.run_shimmed_program(first.to_string(), rest).await?;
                 } else {
                     bail!("Nothing to exec");
                 }
