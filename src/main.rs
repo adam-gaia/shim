@@ -9,15 +9,15 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Stdio;
-use tokio::io::{BufReader, AsyncBufReadExt};
-use tokio::process::Command;
-use tokio_stream::{StreamExt, StreamMap, Stream};
-use tokio_stream::wrappers::LinesStream;
-use std::process::ExitStatus;
-use tokio::io::AsyncRead;
 use std::pin::Pin;
+use std::process::ExitStatus;
+use std::process::Stdio;
+use tokio::io::AsyncRead;
 use tokio::io::Lines;
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Command;
+use tokio_stream::wrappers::LinesStream;
+use tokio_stream::{Stream, StreamExt, StreamMap};
 use which::which;
 
 mod shim;
@@ -91,10 +91,8 @@ enum Commands {
     List,
 }
 
-
-async fn run_command(exec: &str, args: &[String]) -> Result<(ExitStatus)>
-{
-    if let Err(..) = which(exec) { 
+async fn run_command(exec: &str, args: &[String]) -> Result<(ExitStatus)> {
+    if let Err(..) = which(exec) {
         bail!("Unable to find '{}' on the system path", exec);
     }
     let mut child = Command::new(exec)
@@ -107,7 +105,6 @@ async fn run_command(exec: &str, args: &[String]) -> Result<(ExitStatus)>
     let stdout = child.stdout.take().unwrap();
     let stderr = child.stderr.take().unwrap();
 
-
     let mut stdout_reader = LinesStream::new(BufReader::new(stdout).lines());
     let mut stderr_reader = LinesStream::new(BufReader::new(stderr).lines());
 
@@ -115,36 +112,42 @@ async fn run_command(exec: &str, args: &[String]) -> Result<(ExitStatus)>
         while let Some(item) = stdout_reader.next().await {
             yield item;
         }
-    }) as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
+    })
+        as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
     let b = Box::pin(async_stream::stream! {
         while let Some(item) = stderr_reader.next().await {
             yield item;
         }
-    }) as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
+    })
+        as Pin<Box<dyn Stream<Item = std::result::Result<String, std::io::Error>> + Send>>;
 
     let mut map = StreamMap::with_capacity(2);
     map.insert("stdout", a);
     map.insert("stderr", b);
 
-    let handle: tokio::task::JoinHandle<Result<ExitStatus, std::io::Error>> = tokio::spawn(async move {
-        child.wait().await
-    });
- 
+    let handle: tokio::task::JoinHandle<Result<ExitStatus, std::io::Error>> =
+        tokio::spawn(async move { child.wait().await });
+
     // Stream output to terminal as it runs
     while let Some((source, line)) = map.next().await {
-        let line = line?; 
+        let line = line?;
         // TODO: 'match source {}' would allow use to display streams sepreatly
         println!("{}", line);
     }
 
     let child_status = handle.await??;
     debug!("Child process exited with status {}", child_status);
-        if ! child_status.success() {
-            // TODO figure out rust's ExitStatusExt to check if a
-            // signal killed our process and remove the unwrap
-            // TODO: better error handeling to report if a pre/post/override/originalcmd failed
-            bail!("'{} {:?}' returned non-zero exit code {}", exec, args, child_status.code().unwrap());
-        }
+    if !child_status.success() {
+        // TODO figure out rust's ExitStatusExt to check if a
+        // signal killed our process and remove the unwrap
+        // TODO: better error handeling to report if a pre/post/override/originalcmd failed
+        bail!(
+            "'{} {:?}' returned non-zero exit code {}",
+            exec,
+            args,
+            child_status.code().unwrap()
+        );
+    }
     Ok(child_status)
 }
 
@@ -226,7 +229,7 @@ impl App {
                 join_orig_args.push_str(x);
             }
             processed_hook = processed_hook.replace("$@", &join_orig_args)
-        } 
+        }
         // TODO: can we use the `just` tool's eval/run crate?
         // https://github.com/casey/just
 
@@ -236,16 +239,16 @@ impl App {
             if line.starts_with('#') {
                 // Skip commented lines
                 debug!("Skiping comment {}", line);
-                continue
+                continue;
             }
             debug!("Running command: {}", line);
 
-            let parts: Vec<String> = line.split_whitespace().map(|x|x.to_owned()).collect();
+            let parts: Vec<String> = line.split_whitespace().map(|x| x.to_owned()).collect();
             let command = parts[0].as_str();
             let args = &parts[1..];
-            run_command(command, args).await?; 
+            run_command(command, args).await?;
         }
-        
+
         Ok(())
     }
 
@@ -267,7 +270,8 @@ impl App {
                     }
                 }
                 // Run the command specified by this hook
-                self.run_hook(&hook.run, original_command, original_args).await?;
+                self.run_hook(&hook.run, original_command, original_args)
+                    .await?;
             }
         }
         Ok(())
@@ -299,7 +303,8 @@ impl App {
                     &first_arg,
                     &original_command,
                     original_args,
-                ).await?;
+                )
+                .await?;
 
                 // Run any overrides
                 let overrides = shim.overrides();
@@ -309,7 +314,8 @@ impl App {
                         &first_arg,
                         &original_command,
                         original_args,
-                    ).await?;
+                    )
+                    .await?;
                 } else {
                     // No overrides, run the program itself
                     // TODO: create a function for running with an env so that we can use it here
@@ -317,7 +323,7 @@ impl App {
                     // 'which'
                     // TODO handle the None case instead of unwrapping
                     let cmd_as_str = original_command.to_str().unwrap();
-                    run_command(cmd_as_str, original_args).await?;    
+                    run_command(cmd_as_str, original_args).await?;
                 }
 
                 // Run post hooks
@@ -326,7 +332,8 @@ impl App {
                     &first_arg,
                     &original_command,
                     original_args,
-                ).await?;
+                )
+                .await?;
             } else {
                 error!("No registered shim for '{}'", original_command.display());
                 todo!("run this command normally whithout any shims?");
@@ -382,7 +389,7 @@ async fn main() -> Result<()> {
         match &command {
             Commands::Generate => {
                 app.generate_shims()?;
-            },
+            }
             Commands::Exec { trailing_args } => {
                 debug!("Exec {:?}", trailing_args);
                 if let Some((first, rest)) = trailing_args.split_first() {
@@ -390,16 +397,15 @@ async fn main() -> Result<()> {
                 } else {
                     bail!("Nothing to exec");
                 }
-            },
+            }
             Commands::Check => {
                 unimplemented!("todo");
-            },
+            }
             Commands::List => {
                 app.list()?;
             }
         }
-    }
-    else {
+    } else {
         app.list()?;
     }
 
