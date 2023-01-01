@@ -119,7 +119,8 @@ impl App {
         first_arg: &str,
         original_command: &Path,
         original_args: &[String],
-    ) -> Result<()> {
+    ) -> Result<bool> {
+        let mut hook_was_ran = false;
         if let Some(hooks) = hooks {
             for hook in hooks {
                 if let Some(subcommand) = &hook.on_subcommand {
@@ -142,9 +143,10 @@ impl App {
                 // Run the command specified by this hook
                 self.run_hook(&hook.run, original_command, original_args)
                     .await?;
+                hook_was_ran = true;
             }
         }
-        Ok(())
+        Ok(hook_was_ran)
     }
 
     pub async fn run_shimmed_program(&self, original_command: &[String]) -> Result<()> {
@@ -154,7 +156,7 @@ impl App {
             let command_name = original_exec.file_name().unwrap();
             let first_arg = if original_args.is_empty() {
                 // Consider the first argument an empty string, for matching against a subcommand later
-                String::from("")
+                String::from("") // TODO we should have an Option with a None value here instead
             } else {
                 original_args[0].to_string()
             };
@@ -178,8 +180,14 @@ impl App {
                 let overrides = shim.overrides();
                 if overrides.is_some() {
                     debug!("Overrides: {:?}", overrides);
-                    self.process_shim_hooks(overrides, &first_arg, &original_exec, original_args)
-                        .await?;
+                    if !self
+                        .process_shim_hooks(overrides, &first_arg, &original_exec, original_args)
+                        .await?
+                    {
+                        // No override was ran which mean there was no override registered for
+                        // this command. Run the user's command normally
+                        run_command(original_command).await?;
+                    }
                 } else {
                     debug!("No overrides, run the command itself");
                     // No overrides, run the program itself
