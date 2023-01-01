@@ -5,21 +5,18 @@ edition = "2021"
 description = "Create shims for executables from config files"
 license-file = "LICENSE"
 readme = "README.md"
-repository = "https://gitlab.com/adam_gaia/shim"
-homepage = "https://gitlab.com/adam_gaia/shim"
+repository = "https://github.com/adam-gaia/shim"
+homepage = "https://github.com/adam-gaia/shim"
 
 [dependencies]
 anyhow = "1.0.65"
-async-stream = "0.3.3"
 chrono = "0.4.22"
 clap = { version = "4.0.15", features = ["derive", "cargo"] }
 commandstream = "0.2.0"
 directories-next = "2.0.0"
 env_logger = "0.9.1"
-futures-core = "0.3.25"
 log = "0.4.17"
 serde = { version = "1.0.145", features = ["derive"] }
 serde_yaml = "0.9.13"
 tokio = { version = "1.21.2", features = ["process", "macros", "full"] }
-tokio-stream = { version = "0.1.11", features = ["io-util"] }
 which = "4.3.0"
