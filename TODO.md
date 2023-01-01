@@ -4,3 +4,4 @@
 - general code cleanup
 - add to nix home-manager
 - cleanup flake.nix
+- Since we use tokio, should we replace log with trace?

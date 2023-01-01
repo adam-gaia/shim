@@ -1,5 +1,40 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::path::{Path, PathBuf};
+
+pub struct ShimWithMetaInfo {
+    pub shim: Shim,
+    file: PathBuf,
+}
+
+impl ShimWithMetaInfo {
+    pub fn new(shim: Shim, file: PathBuf) -> Self {
+        ShimWithMetaInfo { shim, file }
+    }
+}
+
+impl ShimWithMetaInfo {
+    pub fn shell_function(&self, timestamp: &str, this_program_path: &Path) -> String {
+        let comment = format!(
+            r#"    # Shim for {}
+    # Created automatically by {}
+    #    from config file {}
+    #    at {}"#,
+            self.shim.program(),
+            this_program_path.display(),
+            self.file.display(),
+            timestamp
+        );
+        format!(
+            r#"function {}(){{
+{}
+    shim exec "$@"
+}}"#,
+            self.shim.program(),
+            comment
+        )
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct EnvVar {
