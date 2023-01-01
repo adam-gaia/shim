@@ -28,7 +28,7 @@ impl ShimWithMetaInfo {
         format!(
             r#"function {}(){{
 {}
-    shim exec "$@"
+    shim exec -- "$@"
 }}"#,
             self.shim.program(),
             comment
