@@ -131,14 +131,6 @@ impl App {
                         // Skip this hook since the subcommand doesnt match our arg
                         continue;
                     }
-                } else {
-                    // Hooks that do not specify an 'on_subcommand' are ran when no subcommand is
-                    // specified. Thus, skip when the first arg is defined. TODO: we should use
-                    // None instead of an empty string
-                    if first_arg != "" {
-                        // Skip
-                        continue;
-                    }
                 }
                 // Run the command specified by this hook
                 self.run_hook(&hook.run, original_command, original_args)
@@ -199,6 +191,7 @@ impl App {
                 }
 
                 // Run post hooks
+                log::warn!("Running post-hooks");
                 self.process_shim_hooks(
                     shim.post_hooks(),
                     &first_arg,
