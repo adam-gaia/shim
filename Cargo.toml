@@ -19,4 +19,4 @@ log = "0.4.17"
 serde = { version = "1.0.145", features = ["derive"] }
 serde_yaml = "0.9.13"
 tokio = { version = "1.21.2", features = ["process", "macros", "full"] }
-which = "4.3.0"
+which = "6.0.0"
