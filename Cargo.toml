@@ -12,7 +12,7 @@ homepage = "https://github.com/adam-gaia/shim"
 anyhow = "1.0.65"
 chrono = "0.4.22"
 clap = { version = "4.0.15", features = ["derive", "cargo"] }
-commandstream = "0.2.0"
+commandstream = "0.3.0"
 directories-next = "2.0.0"
 env_logger = "0.11.0"
 log = "0.4.17"
